@@ -32,16 +32,16 @@ export const ADAPTIVE_RULES: AdaptiveRule[] = [
   },
   {
     id: 'athlete-under-18-guardian-consent',
-    description: 'If athlete is under 18, require guardian or coach consent.',
-    when: [{ field: 'age', operator: 'lte', value: 17 }],
-    showFields: ['minorGuardianConsent'],
+    description: 'If athlete is under 18 (computed from DOB), require guardian email.',
+    when: [{ field: 'isMinor', operator: 'truthy', source: 'context' }],
+    showFields: ['guardianEmail'],
     severity: 'required',
   },
   {
     id: 'athlete-current-injury-capture',
-    description: 'If the athlete reports a current issue, capture severity and location.',
-    when: [{ field: 'currentIssue', operator: 'eq', value: 'Yes' }],
-    showFields: ['injurySeverity', 'injuryLocations'],
+    description: 'If the athlete reports a niggle or active injury, capture the body region.',
+    when: [{ field: 'currentIssue', operator: 'in', value: ['Niggle', 'Active injury'] }],
+    showFields: ['injuryLocations'],
     severity: 'guard',
   },
   {
@@ -50,13 +50,6 @@ export const ADAPTIVE_RULES: AdaptiveRule[] = [
     when: [{ field: 'injuryStatus', operator: 'ne', value: 'none' }],
     showFields: ['limitationArea'],
     severity: 'guard',
-  },
-  {
-    id: 'coach-multi-team-structure',
-    description: 'If the coach manages multiple teams, collect team structure details.',
-    when: [{ field: 'teamType', operator: 'eq', value: 'Multiple Teams / Age Groups' }],
-    showFields: ['teamStructure'],
-    severity: 'info',
   },
   {
     id: 'daily-session-load-follow-up',

@@ -31,10 +31,9 @@ export function AuthListener() {
 
         if (profile && profile.onboarding_completed === false) {
            const isAlreadyOnOnboarding =
-             window.location.pathname.startsWith('/onboarding') ||
              window.location.pathname.startsWith('/fitstart') ||
              window.location.pathname.includes('/onboarding')
-           
+
           if (!isAlreadyOnOnboarding && isAppRole(profile.role)) {
             router.push(getRoleOnboardingRoute(profile.role))
           }

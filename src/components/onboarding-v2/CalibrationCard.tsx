@@ -77,10 +77,8 @@ export function CalibrationCard({
   const accent = TIER_ACCENT[tier]
   const tierText = TIER_TEXT[tier]
   const tierLabel = TIER_LABEL[tier]
-  const ritualHref = '/onboarding/daily-ritual'
-  const phase2Href = snapshot.phase2.nextDay
-    ? `/onboarding/phase-2?day=${snapshot.phase2.nextDay}`
-    : '/onboarding/phase-2'
+  const ritualHref = persona === 'individual' ? '/individual/logging' : '/athlete/checkin'
+  const phase2Href = `/${persona}/dashboard`
   const scanHref = `/${persona}/scan/analyze?sport=other&baseline=onboarding_v2&source=web`
 
   const topWeakLink = pickTopWeakLink(snapshot.latestMovementBaseline?.weakLinks ?? [])
@@ -221,7 +219,7 @@ function CoachContinueOnboardingCta({
   }
   return (
     <Link
-      href="/onboarding"
+      href="/coach/onboarding"
       className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 transition hover:bg-white/[0.04]"
     >
       <div className="min-w-0">

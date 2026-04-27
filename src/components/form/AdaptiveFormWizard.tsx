@@ -107,10 +107,27 @@ export function AdaptiveFormWizard({
   const stepCompletionCountRef = useRef(0)
   const trackedQuestionSetRef = useRef(new Set(trackedQuestionIds))
 
+  // Derive context flags that depend on the user's own answers. `isMinor` lets
+  // the consent step reveal a guardian email field only when the athlete is
+  // under 18 (computed from DOB).
+  const isMinorFromDob = (() => {
+    const dobValue = answers['dateOfBirth']
+    if (typeof dobValue !== 'string' || !dobValue) return false
+    const dob = new Date(dobValue)
+    if (Number.isNaN(dob.getTime())) return false
+    const today = new Date()
+    const age =
+      today.getFullYear() -
+      dob.getFullYear() -
+      (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0)
+    return age < 18
+  })()
+
   const liveContext = {
     ...context,
     trackTrainingToday: advancedLogging,
     hasOutstandingTrainingCapture: advancedLogging,
+    isMinor: isMinorFromDob,
   }
 
   const visibleSteps = getVisibleSteps(flow, answers, liveContext)
@@ -492,7 +509,7 @@ export function AdaptiveFormWizard({
 
     return (
       <input
-        type={field.inputType === 'number' ? 'number' : field.inputType === 'phone' ? 'tel' : field.inputType === 'time' ? 'time' : 'text'}
+        type={field.inputType === 'number' ? 'number' : field.inputType === 'phone' ? 'tel' : field.inputType === 'time' ? 'time' : field.inputType === 'date' ? 'date' : 'text'}
         value={String(value)}
         min={field.min}
         max={field.max}

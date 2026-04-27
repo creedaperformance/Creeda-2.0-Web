@@ -1,7 +1,21 @@
 import * as z from 'zod'
 
-import { SPORTS_LIST } from '@/lib/constants'
 import type { FormFieldDefinition } from '@/forms/types'
+
+export const coachSportOptions = [
+  'Cricket',
+  'Football',
+  'Athletics',
+  'Gym',
+  'Multi-sport',
+] as const
+
+export const coachingLevelOptions = [
+  'Academy',
+  'Club',
+  'School',
+  'Private (1-on-1)',
+] as const
 
 export const coachOnboardingFields: FormFieldDefinition[] = [
   {
@@ -16,37 +30,15 @@ export const coachOnboardingFields: FormFieldDefinition[] = [
     placeholder: 'Coach Anil Kumar',
   },
   {
-    id: 'username',
-    label: 'Choose your coach handle',
-    helper: 'Used for lookup and mentions.',
-    inputType: 'text',
-    category: 'baseline',
-    layer: 'layer1',
-    required: true,
-    backendMappingKey: 'username',
-    placeholder: 'coach_anil',
-  },
-  {
     id: 'mobileNumber',
     label: 'WhatsApp or mobile number',
-    helper: 'Used for verification and squad coordination.',
+    helper: 'Used for verification and squad coordination over WhatsApp.',
     inputType: 'phone',
     category: 'baseline',
     layer: 'layer1',
     required: true,
     backendMappingKey: 'mobileNumber',
     placeholder: '+91 98XXXX XXXXX',
-  },
-  {
-    id: 'teamName',
-    label: 'What is your main squad or setup called?',
-    helper: 'You can add more teams later.',
-    inputType: 'text',
-    category: 'baseline',
-    layer: 'layer1',
-    required: true,
-    backendMappingKey: 'teamName',
-    placeholder: 'Haryana U-19 Fast Bowling Unit',
   },
   {
     id: 'sportCoached',
@@ -57,7 +49,18 @@ export const coachOnboardingFields: FormFieldDefinition[] = [
     layer: 'layer1',
     required: true,
     backendMappingKey: 'sportCoached',
-    options: SPORTS_LIST.map((sport) => ({ label: sport, value: sport })),
+    options: coachSportOptions.map((sport) => ({ label: sport, value: sport })),
+  },
+  {
+    id: 'teamName',
+    label: 'What is your main team or academy called?',
+    helper: 'You can add more teams from the dashboard later.',
+    inputType: 'text',
+    category: 'baseline',
+    layer: 'layer1',
+    required: true,
+    backendMappingKey: 'teamName',
+    placeholder: 'Haryana U-19 Fast Bowling Unit',
   },
   {
     id: 'coachingLevel',
@@ -68,108 +71,43 @@ export const coachOnboardingFields: FormFieldDefinition[] = [
     layer: 'layer1',
     required: true,
     backendMappingKey: 'coachingLevel',
-    options: [
-      { label: 'Private Pro Coach', value: 'Private Pro Coach' },
-      { label: 'Academy / Club Coach', value: 'Academy / Club Coach' },
-      { label: 'School / University Coach', value: 'School / University Coach' },
-    ],
+    options: coachingLevelOptions.map((level) => ({ label: level, value: level })),
   },
   {
-    id: 'teamType',
-    label: 'How do you coach today?',
-    helper: 'This determines whether we ask for team structure details.',
-    inputType: 'chips',
+    id: 'squadSize',
+    label: 'How many athletes are in your squad right now?',
+    helper: 'Enough to size the first dashboard correctly. You can change this later.',
+    inputType: 'number',
     category: 'baseline',
     layer: 'layer1',
     required: true,
-    backendMappingKey: 'teamType',
-    options: [
-      { label: 'Single team', value: 'Single Team' },
-      { label: 'Multiple teams / age groups', value: 'Multiple Teams / Age Groups' },
-      { label: 'Individual athletes', value: 'Individual Athletes' },
-    ],
+    backendMappingKey: 'squadSize',
+    min: 1,
+    max: 200,
+    step: 1,
+    placeholder: '12',
   },
   {
-    id: 'numberOfAthletes',
-    label: 'How many athletes are active right now?',
-    helper: 'Enough to size the first dashboard correctly.',
-    inputType: 'chips',
+    id: 'platformConsent',
+    label:
+      'I agree to the CREEDA terms, privacy, AI guidance, and medical disclaimer, and I confirm consent to manage my squad data.',
+    helper: 'One tap covers legal, medical, AI, and data-handling acknowledgements.',
+    inputType: 'toggle',
     category: 'baseline',
     layer: 'layer1',
     required: true,
-    backendMappingKey: 'numberOfAthletes',
-    options: [
-      { label: '1-5', value: '1-5' },
-      { label: '6-15', value: '6-15' },
-      { label: '16-30', value: '16-30' },
-      { label: '30+', value: '30+' },
-    ],
-  },
-  {
-    id: 'mainCoachingFocus',
-    label: 'What do you care about most right now?',
-    helper: 'This drives the first version of your coach dashboard.',
-    inputType: 'chips',
-    category: 'baseline',
-    layer: 'layer1',
-    required: true,
-    backendMappingKey: ['mainCoachingFocus', 'criticalRisks'],
-    options: [
-      { label: 'Injury Risk Reduction', value: 'Injury Risk Reduction' },
-      { label: 'Peak Performance Optimization', value: 'Peak Performance Optimization' },
-      { label: 'Player Compliance', value: 'Player Compliance' },
-      { label: 'Scouting / Talent ID', value: 'Scouting / Talent ID' },
-    ],
-  },
-  {
-    id: 'trainingFrequency',
-    label: 'How often do your athletes usually train with you?',
-    helper: 'Useful but not essential for fast start.',
-    inputType: 'chips',
-    category: 'progressive',
-    layer: 'layer2',
-    required: false,
-    backendMappingKey: 'trainingFrequency',
-    options: [
-      { label: 'Daily', value: 'Daily' },
-      { label: '3-4x Weekly', value: '3-4x Weekly' },
-      { label: '1-2x Weekly', value: '1-2x Weekly' },
-    ],
-  },
-  {
-    id: 'teamStructure',
-    label: 'How many groups or age bands do you run?',
-    helper: 'Only shown for multi-team setups.',
-    inputType: 'text',
-    category: 'conditional',
-    layer: 'layer2',
-    required: false,
-    backendMappingKey: 'teamStructure',
-    triggerConditions: [{ field: 'teamType', operator: 'eq', value: 'Multiple Teams / Age Groups' }],
-    placeholder: 'e.g. U-14, U-17, Senior',
+    backendMappingKey: ['legalConsent', 'medicalDisclaimerConsent', 'dataProcessingConsent', 'aiAcknowledgementConsent'],
   },
 ]
 
 export const coachOnboardingFastStartSchema = z.object({
   fullName: z.string().min(2),
-  username: z
-    .string()
-    .min(3)
-    .regex(/^[a-zA-Z0-9_]+$/, 'Only letters, numbers, and underscores allowed'),
   mobileNumber: z.string().min(10),
+  sportCoached: z.enum(coachSportOptions),
   teamName: z.string().min(2),
-  sportCoached: z.enum(SPORTS_LIST),
-  coachingLevel: z.enum(['Private Pro Coach', 'Academy / Club Coach', 'School / University Coach']),
-  teamType: z.enum(['Single Team', 'Multiple Teams / Age Groups', 'Individual Athletes']),
-  numberOfAthletes: z.enum(['1-5', '6-15', '16-30', '30+']),
-  mainCoachingFocus: z.enum([
-    'Injury Risk Reduction',
-    'Peak Performance Optimization',
-    'Player Compliance',
-    'Scouting / Talent ID',
-  ]),
-  trainingFrequency: z.enum(['Daily', '3-4x Weekly', '1-2x Weekly']).optional(),
-  teamStructure: z.string().optional().default(''),
+  coachingLevel: z.enum(coachingLevelOptions),
+  squadSize: z.coerce.number().int().min(1).max(200),
+  platformConsent: z.boolean().refine((value) => value === true),
 })
 
 export type CoachOnboardingFastStart = z.infer<typeof coachOnboardingFastStartSchema>

@@ -35,7 +35,7 @@ export default async function IndividualReviewPage() {
     .eq('id', user.id)
     .single()
 
-  if (!profile) redirect('/onboarding')
+  if (!profile) redirect('/signup')
   if (profile.role !== 'individual') redirect(`/${profile.role}/dashboard`)
   if (!profile.onboarding_completed) redirect('/fitstart')
 

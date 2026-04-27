@@ -86,11 +86,30 @@ export async function submitAdaptiveAthleteOnboarding(rawData: unknown) {
   const admin = createAdminClient()
   const requestHeaders = await headers()
 
+  // Pull display name + existing handle from the profile (set at signup) since
+  // the simplified V1 onboarding no longer asks for them.
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('full_name, username')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const profileFullName =
+    typeof existingProfile?.full_name === 'string' ? existingProfile.full_name : ''
+  const metadataFullName =
+    typeof user.user_metadata?.full_name === 'string' ? user.user_metadata.full_name : ''
+  const fullName = profileFullName || metadataFullName || ''
+
   const result = await submitAthleteOnboardingForUser({
     supabase,
     adminLookupSupabase: admin,
     userId: user.id,
-    payload: mapAdaptiveAthleteOnboardingToLegacy(parsed.data),
+    payload: mapAdaptiveAthleteOnboardingToLegacy(parsed.data, {
+      fullName,
+      username:
+        typeof existingProfile?.username === 'string' ? existingProfile.username : undefined,
+      userId: user.id,
+    }),
     auditMeta: {
       userAgent: requestHeaders.get('user-agent'),
       requestIp: requestHeaders.get('x-forwarded-for'),

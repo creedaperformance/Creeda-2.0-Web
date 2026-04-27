@@ -1,27 +1,38 @@
 import * as z from 'zod'
 
-import { SPORTS_LIST } from '@/lib/constants'
 import type { FormFieldDefinition } from '@/forms/types'
+
+// Simplified V1 athlete onboarding: 8 questions + a single consolidated consent.
+// Frontend-only narrowing — the legacy DB schema is unchanged. Mapper layer
+// expands these into the broader AthleteOnboardingPayload shape.
+
+export const athleteSportOptions = ['Cricket', 'Football', 'Athletics', 'Gym'] as const
+export type AthleteSportOption = (typeof athleteSportOptions)[number]
+
+export const cricketPositionOptions = ['Bowler', 'Batter', 'Wicket-keeper', 'All-rounder'] as const
+export const footballPositionOptions = ['Goalkeeper', 'Defender', 'Midfielder', 'Forward'] as const
+export const athleticsEventOptions = ['Sprint', 'Distance', 'Jumps', 'Throws'] as const
+export const gymFocusOptions = ['Strength', 'Hypertrophy', 'General fitness'] as const
+
+const allPositionValues = [
+  ...cricketPositionOptions,
+  ...footballPositionOptions,
+  ...athleticsEventOptions,
+  ...gymFocusOptions,
+] as const
 
 export const athleteLevelOptions = [
   'Recreational',
-  'School',
-  'District',
-  'State',
-  'National',
-  'Professional',
+  'Club',
+  'Academy',
+  'State+',
+  'National+',
 ] as const
 
-export const athleteGoalOptions = [
-  'Performance Enhancement',
-  'Injury Prevention',
-  'Recovery Efficiency',
-  'Return from Injury',
-  'Competition Prep',
-] as const
+export const biologicalSexOptions = ['Male', 'Female', 'Prefer not to say'] as const
 
-export const biologicalSexOptions = ['Male', 'Female', 'Other'] as const
-export const injurySeverityOptions = ['mild', 'moderate', 'high'] as const
+export const currentIssueOptions = ['None', 'Niggle', 'Active injury'] as const
+
 export const commonBodyRegions = [
   'Neck',
   'Shoulder',
@@ -37,87 +48,68 @@ export const commonBodyRegions = [
   'Wrist / hand',
 ] as const
 
-const positionRelevantSports = [
-  'Cricket',
-  'Football',
-  'Basketball',
-  'Hockey',
-  'Kabaddi',
-  'Badminton',
-  'Volleyball',
-] satisfies readonly string[]
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 export const athleteOnboardingFields: FormFieldDefinition[] = [
   {
-    id: 'fullName',
-    label: 'What should we call you?',
-    helper: 'Your public athlete profile name.',
-    inputType: 'text',
-    category: 'baseline',
-    layer: 'layer1',
-    required: true,
-    backendMappingKey: 'fullName',
-    placeholder: 'Aarav Sharma',
-  },
-  {
-    id: 'username',
-    label: 'Choose a CREEDA handle',
-    helper: 'Used by coaches and teammates to find you.',
-    inputType: 'text',
-    category: 'baseline',
-    layer: 'layer1',
-    required: true,
-    backendMappingKey: 'username',
-    placeholder: 'aarav_s',
-  },
-  {
     id: 'primarySport',
-    label: 'What do you compete in most seriously?',
-    helper: 'This sets the first version of your sport model.',
+    label: 'What sport do you train for?',
+    helper: 'Pick your primary sport. You can refine details next.',
     inputType: 'chips',
     category: 'baseline',
     layer: 'layer1',
     required: true,
     backendMappingKey: 'primarySport',
-    options: SPORTS_LIST.map((sport) => ({
-      label: sport,
-      value: sport,
-    })),
+    options: athleteSportOptions.map((sport) => ({ label: sport, value: sport })),
   },
   {
     id: 'position',
-    label: 'What role do you usually play?',
-    helper: 'Shown only when role meaningfully changes load or risk.',
-    inputType: 'text',
+    label: 'Which role or event fits you best?',
+    helper: 'This shapes your training focus from day one.',
+    inputType: 'chips',
     category: 'conditional',
     layer: 'layer1',
-    required: false,
+    required: true,
     backendMappingKey: 'position',
     triggerConditions: [
       {
         field: 'primarySport',
         operator: 'in',
-        value: [...positionRelevantSports],
+        value: [...athleteSportOptions],
       },
     ],
-    placeholder: 'e.g. Bowler, Midfielder, Setter',
+    options: [
+      ...cricketPositionOptions.map((value) => ({ label: value, value })),
+      ...footballPositionOptions.map((value) => ({ label: value, value })),
+      ...athleticsEventOptions.map((value) => ({ label: value, value })),
+      ...gymFocusOptions.map((value) => ({ label: value, value })),
+    ],
   },
   {
-    id: 'age',
-    label: 'How old are you?',
-    helper: 'Age changes load tolerance, recovery expectation, and consent rules.',
-    inputType: 'number',
+    id: 'playingLevel',
+    label: 'How seriously do you compete or train?',
+    helper: 'This helps us calibrate training density and intensity.',
+    inputType: 'chips',
     category: 'baseline',
     layer: 'layer1',
     required: true,
-    backendMappingKey: 'age',
-    min: 8,
-    max: 80,
-    unit: 'years',
+    backendMappingKey: ['playingLevel', 'trainingFrequency', 'avgIntensity'],
+    options: athleteLevelOptions.map((value) => ({ label: value, value })),
+  },
+  {
+    id: 'dateOfBirth',
+    label: 'Date of birth',
+    helper: 'Used for age-based training, recovery, and consent rules.',
+    inputType: 'date',
+    category: 'baseline',
+    layer: 'layer1',
+    required: true,
+    backendMappingKey: 'dateOfBirth',
+    placeholder: 'YYYY-MM-DD',
   },
   {
     id: 'biologicalSex',
-    label: 'Biological sex',
+    label: 'Sex assigned at birth',
     helper: 'Used only for baseline physiology assumptions until we learn your real trends.',
     inputType: 'chips',
     category: 'baseline',
@@ -127,19 +119,8 @@ export const athleteOnboardingFields: FormFieldDefinition[] = [
     options: biologicalSexOptions.map((value) => ({ label: value, value })),
   },
   {
-    id: 'playingLevel',
-    label: 'What level are you currently playing at?',
-    helper: 'This helps us infer training density and sport demands.',
-    inputType: 'chips',
-    category: 'baseline',
-    layer: 'layer1',
-    required: true,
-    backendMappingKey: ['playingLevel', 'trainingFrequency', 'avgIntensity'],
-    options: athleteLevelOptions.map((value) => ({ label: value, value })),
-  },
-  {
     id: 'heightCm',
-    label: 'Height',
+    label: 'Height (cm)',
     helper: 'A quick body-size anchor improves training and fueling recommendations.',
     inputType: 'number',
     category: 'baseline',
@@ -152,8 +133,8 @@ export const athleteOnboardingFields: FormFieldDefinition[] = [
   },
   {
     id: 'weightKg',
-    label: 'Weight',
-    helper: 'This is used for baseline load, readiness, and nutrition assumptions.',
+    label: 'Weight (kg)',
+    helper: 'Used for baseline load, readiness, and nutrition assumptions.',
     inputType: 'number',
     category: 'baseline',
     layer: 'layer1',
@@ -164,201 +145,122 @@ export const athleteOnboardingFields: FormFieldDefinition[] = [
     unit: 'kg',
   },
   {
-    id: 'primaryGoal',
-    label: 'What do you want CREEDA to help with first?',
-    helper: 'We will personalize your first dashboard around this.',
-    inputType: 'chips',
-    category: 'baseline',
-    layer: 'layer1',
-    required: true,
-    backendMappingKey: 'primaryGoal',
-    options: athleteGoalOptions.map((value) => ({ label: value, value })),
-  },
-  {
     id: 'currentIssue',
-    label: 'Are you dealing with any pain or injury right now?',
-    helper: 'We only go deeper if the answer is yes.',
+    label: 'Any pain or injury right now?',
+    helper: 'A quick honesty check so early recommendations stay safe.',
     inputType: 'chips',
     category: 'baseline',
     layer: 'layer1',
     required: true,
     backendMappingKey: ['currentIssue', 'activeInjuries'],
     options: [
-      { label: 'No issues', value: 'No', emoji: '✅' },
-      { label: 'Yes, something is off', value: 'Yes', emoji: '⚠️' },
-    ],
-  },
-  {
-    id: 'injurySeverity',
-    label: 'How much is it affecting you?',
-    helper: 'A quick severity tag is enough for the first version.',
-    inputType: 'chips',
-    category: 'conditional',
-    layer: 'layer1',
-    required: false,
-    backendMappingKey: 'activeInjuries.severity',
-    triggerConditions: [{ field: 'currentIssue', operator: 'eq', value: 'Yes' }],
-    options: [
-      { label: 'Mild', value: 'mild' },
-      { label: 'Moderate', value: 'moderate' },
-      { label: 'High', value: 'high' },
+      { label: 'None', value: 'None', emoji: '✅' },
+      { label: 'Niggle', value: 'Niggle', emoji: '⚡' },
+      { label: 'Active injury', value: 'Active injury', emoji: '⚠️' },
     ],
   },
   {
     id: 'injuryLocations',
     label: 'Where is the issue?',
-    helper: 'Pick the main body area only. We can refine later.',
+    helper: 'Tap the main body area. We can refine later.',
     inputType: 'body-map',
     category: 'conditional',
     layer: 'layer1',
     required: false,
     backendMappingKey: 'activeInjuries.region',
-    triggerConditions: [{ field: 'currentIssue', operator: 'eq', value: 'Yes' }],
+    triggerConditions: [{ field: 'currentIssue', operator: 'in', value: ['Niggle', 'Active injury'] }],
     options: commonBodyRegions.map((value) => ({ label: value, value })),
-    maxSelections: 2,
+    maxSelections: 1,
   },
   {
     id: 'coachLockerCode',
     label: 'Coach or academy code',
-    helper: 'Optional. Add it now if a coach invited you.',
+    helper: 'Optional — only add if a coach invited you.',
     inputType: 'text',
-    category: 'progressive',
+    category: 'baseline',
     layer: 'layer1',
     required: false,
     backendMappingKey: 'coachLockerCode',
-    placeholder: '123456',
+    placeholder: '6-digit code',
   },
   {
     id: 'platformConsent',
-    label: 'Allow CREEDA to use your responses to personalize training and recovery guidance',
-    helper: 'Covers platform terms, privacy, and data use for personalization.',
+    label:
+      'I agree to the CREEDA terms, privacy and data use, the medical disclaimer (CREEDA is not a substitute for medical advice), and that AI-driven guidance is informational only.',
+    helper: 'One quick acknowledgement covers terms, medical disclaimer, AI use, and data processing.',
     inputType: 'toggle',
     category: 'baseline',
     layer: 'layer1',
     required: true,
-    backendMappingKey: ['legalConsent', 'dataProcessingConsent', 'aiAcknowledgementConsent'],
+    backendMappingKey: ['legalConsent', 'medicalDisclaimerConsent', 'dataProcessingConsent', 'aiAcknowledgementConsent'],
   },
   {
-    id: 'medicalDisclaimerConsent',
-    label: 'I understand CREEDA is not a replacement for medical diagnosis',
-    helper: 'Required because readiness guidance should never replace a clinician.',
-    inputType: 'toggle',
-    category: 'baseline',
-    layer: 'layer1',
-    required: true,
-    backendMappingKey: 'medicalDisclaimerConsent',
-  },
-  {
-    id: 'minorGuardianConsent',
-    label: 'Guardian or coach consent confirmed',
-    helper: 'Required for athletes under 18.',
-    inputType: 'toggle',
+    id: 'guardianEmail',
+    label: 'Guardian email',
+    helper: 'Required for athletes under 18 — we email them a quick consent confirmation.',
+    inputType: 'text',
     category: 'conditional',
     layer: 'layer1',
     required: false,
-    backendMappingKey: 'minorGuardianConsent',
-    triggerConditions: [{ field: 'age', operator: 'lte', value: 17 }],
-  },
-  {
-    id: 'marketingConsent',
-    label: 'Send me product updates and performance tips',
-    helper: 'Optional and never blocks setup.',
-    inputType: 'toggle',
-    category: 'progressive',
-    layer: 'layer2',
-    required: false,
-    backendMappingKey: 'marketingConsent',
-  },
-  {
-    id: 'typicalWeeklyHours',
-    label: 'How many hours do you train in a normal week?',
-    helper: 'Good for improving load precision.',
-    inputType: 'slider',
-    category: 'progressive',
-    layer: 'layer2',
-    required: false,
-    backendMappingKey: ['typicalWeeklyHours', 'typicalRPE'],
-    min: 0,
-    max: 20,
-    step: 1,
-    unit: 'hrs',
-  },
-  {
-    id: 'typicalSleep',
-    label: 'What does sleep usually look like?',
-    helper: 'Useful for a stronger baseline, but not required for day one.',
-    inputType: 'chips',
-    category: 'progressive',
-    layer: 'layer2',
-    required: false,
-    backendMappingKey: ['typicalSleep', 'usualWakeUpTime', 'typicalEnergy', 'typicalSoreness'],
-    options: [
-      { label: '< 6 hours', value: '< 6 hours' },
-      { label: '6-7 hours', value: '6-7 hours' },
-      { label: '7-8 hours', value: '7-8 hours' },
-      { label: '8-9 hours', value: '8-9 hours' },
-      { label: '> 9 hours', value: '> 9 hours' },
-    ],
-  },
-  {
-    id: 'movementRobustness',
-    label: 'How confident do you feel in your movement quality?',
-    helper: 'This sits later because it is better learned over time or with testing.',
-    inputType: 'slider',
-    category: 'progressive',
-    layer: 'layer3',
-    required: false,
-    backendMappingKey: [
-      'movement_robustness',
-      'coordination_control',
-      'agility_control',
-      'load_tolerance',
-    ],
-    min: 1,
-    max: 4,
-    step: 1,
+    backendMappingKey: 'guardianEmail',
+    placeholder: 'guardian@example.com',
+    triggerConditions: [{ field: 'isMinor', operator: 'truthy', source: 'context' }],
   },
 ]
 
 export const athleteOnboardingFastStartSchema = z
   .object({
-    fullName: z.string().min(2),
-    username: z
-      .string()
-      .min(3)
-      .regex(/^[a-zA-Z0-9_]+$/, 'Only letters, numbers, and underscores allowed'),
-    primarySport: z.enum(SPORTS_LIST),
-    position: z.string().optional().default(''),
-    age: z.number().min(8).max(80),
-    biologicalSex: z.enum(biologicalSexOptions),
+    primarySport: z.enum(athleteSportOptions),
+    position: z.enum(allPositionValues),
     playingLevel: z.enum(athleteLevelOptions),
+    dateOfBirth: z
+      .string()
+      .regex(ISO_DATE_PATTERN, 'Please enter a valid date of birth.')
+      .refine((value) => {
+        const parsed = new Date(value)
+        if (Number.isNaN(parsed.getTime())) return false
+        const now = new Date()
+        const age =
+          now.getFullYear() -
+          parsed.getFullYear() -
+          (now < new Date(now.getFullYear(), parsed.getMonth(), parsed.getDate()) ? 1 : 0)
+        return age >= 8 && age <= 80
+      }, 'Athlete age must be between 8 and 80.'),
+    biologicalSex: z.enum(biologicalSexOptions),
     heightCm: z.number().min(100).max(250),
     weightKg: z.number().min(20).max(200),
-    primaryGoal: z.enum(athleteGoalOptions),
-    currentIssue: z.enum(['No', 'Yes']),
-    injurySeverity: z.enum(injurySeverityOptions).optional(),
-    injuryLocations: z.array(z.enum(commonBodyRegions)).max(2).optional().default([]),
+    currentIssue: z.enum(currentIssueOptions),
+    injuryLocations: z.array(z.enum(commonBodyRegions)).max(1).optional().default([]),
     coachLockerCode: z.string().optional().default(''),
-    platformConsent: z.boolean().refine((value) => value === true),
-    medicalDisclaimerConsent: z.boolean().refine((value) => value === true),
-    minorGuardianConsent: z.boolean().optional().default(false),
-    marketingConsent: z.boolean().optional().default(false),
+    platformConsent: z.boolean().refine((value) => value === true, 'Please accept the consolidated agreement to continue.'),
+    guardianEmail: z.string().email().optional().or(z.literal('')).default(''),
   })
   .superRefine((data, ctx) => {
-    if (data.age < 18 && !data.minorGuardianConsent) {
+    if (data.currentIssue !== 'None' && (!data.injuryLocations || data.injuryLocations.length === 0)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Guardian or coach consent is required for athletes under 18.',
-        path: ['minorGuardianConsent'],
+        message: 'Please tap the body area where you feel the issue.',
+        path: ['injuryLocations'],
       })
     }
 
-    if (data.currentIssue === 'Yes' && data.injuryLocations.length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Please choose at least one body area.',
-        path: ['injuryLocations'],
-      })
+    const dob = new Date(data.dateOfBirth)
+    if (!Number.isNaN(dob.getTime())) {
+      const today = new Date()
+      const computedAge =
+        today.getFullYear() -
+        dob.getFullYear() -
+        (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0)
+
+      if (computedAge < 18) {
+        if (!data.guardianEmail || data.guardianEmail.length === 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Guardian email is required for athletes under 18.',
+            path: ['guardianEmail'],
+          })
+        }
+      }
     }
   })
 
