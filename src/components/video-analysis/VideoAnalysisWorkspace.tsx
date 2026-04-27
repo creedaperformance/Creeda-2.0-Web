@@ -818,8 +818,8 @@ function AnalyzeContent({ role }: Props) {
       }
 
       if (baselineSucceeded) {
-        // Cinematic Aha-moment landing — uses the just-persisted baseline.
-        router.push('/onboarding/aha')
+        // Aha screen lived under the deprecated /onboarding surface; route to the persona dashboard.
+        router.push(`/${role}/dashboard`)
         return
       }
     }

@@ -8,7 +8,6 @@ import { athleteDailyFlow, athleteOnboardingFlow } from '@/forms/flows/athleteFl
 import { coachOnboardingFlow } from '@/forms/flows/coachFlow'
 import { individualDailyFlow, individualOnboardingFlow } from '@/forms/flows/individualFlow'
 import type { AdaptiveProfilePrefill, AdaptiveProfileSummary, FormFlowDefinition } from '@/forms/types'
-import { normalizeIndividualOccupation } from '@/lib/individual_performance_engine'
 
 const ADAPTIVE_FORM_PROFILES_TABLE = 'adaptive_form_profiles'
 const ADAPTIVE_DAILY_LOGS_TABLE = 'adaptive_daily_logs'
@@ -65,12 +64,55 @@ function pickNumber(value: unknown, fallback = 0) {
   return typeof value === 'number' ? value : fallback
 }
 
+function compactPrimarySport(legacySport: string): string {
+  if (!legacySport) return ''
+  if (legacySport === 'Cricket') return 'Cricket'
+  if (legacySport === 'Football') return 'Football'
+  if (legacySport.startsWith('Athletics')) return 'Athletics'
+  if (
+    legacySport === 'Powerlifting' ||
+    legacySport === 'Weightlifting' ||
+    legacySport === 'Other'
+  ) {
+    return 'Gym'
+  }
+  return ''
+}
+
+function simplifyPlayingLevel(legacyLevel: string): string {
+  switch (legacyLevel) {
+    case 'National':
+    case 'Professional':
+      return 'National+'
+    case 'State':
+      return 'State+'
+    case 'District':
+      return 'Academy'
+    case 'School':
+      return 'Club'
+    case 'Recreational':
+      return 'Recreational'
+    default:
+      return ''
+  }
+}
+
+function legacySexToSimplified(legacy: string): string {
+  if (legacy === 'Male' || legacy === 'Female') return legacy
+  return 'Prefer not to say'
+}
+
+function legacyCurrentIssueToSimplified(value: string, hadHighSeverity: boolean): string {
+  if (value === 'Yes') return hadHighSeverity ? 'Active injury' : 'Niggle'
+  return 'None'
+}
+
 async function deriveAthleteAnswersFromLegacy(supabase: SupabaseLike, userId: string) {
   const [{ data: profile }, { data: diagnostic }] = await Promise.all([
     supabase
       .from('profiles')
       .select(
-        'full_name, username, primary_sport, position, height, weight, guardian_consent_confirmed, legal_consent_at, medical_disclaimer_accepted_at'
+        'full_name, username, primary_sport, position, height, weight, date_of_birth, guardian_consent_confirmed, legal_consent_at, medical_disclaimer_accepted_at'
       )
       .eq('id', userId)
       .maybeSingle(),
@@ -90,33 +132,35 @@ async function deriveAthleteAnswersFromLegacy(supabase: SupabaseLike, userId: st
   const injuryLocations = activeInjuries
     .map((item: unknown) => (isRecord(item) ? pickString(item.region) : ''))
     .filter(Boolean)
-    .slice(0, 2)
+    .slice(0, 1)
+  const hadHighSeverity = activeInjuries.some(
+    (item: unknown) => isRecord(item) && item.recurring === true
+  )
+
+  const legacySport = pickString(profile?.primary_sport, pickString(sportContext.primarySport))
+  const legacyLevel = pickString(sportContext.playingLevel)
+  const legacySex = pickString(profileData.biologicalSex)
+  const dob = pickString(
+    (profile as { date_of_birth?: unknown } | null)?.date_of_birth,
+    pickString(profileData.dateOfBirth)
+  )
 
   const answers = {
-    fullName: pickString(profile?.full_name, pickString(profileData.fullName)),
-    username: pickString(profile?.username),
-    primarySport: pickString(profile?.primary_sport, pickString(sportContext.primarySport)),
+    primarySport: compactPrimarySport(legacySport),
     position: pickString(profile?.position, pickString(sportContext.position)),
-    age: pickNumber(profileData.age),
-    biologicalSex: pickString(profileData.biologicalSex, 'Other'),
-    playingLevel: pickString(sportContext.playingLevel, 'Recreational'),
+    playingLevel: simplifyPlayingLevel(legacyLevel),
+    dateOfBirth: dob,
+    biologicalSex: legacySexToSimplified(legacySex),
     heightCm: pickNumber(profile?.height, pickNumber(profileData.heightCm)),
     weightKg: pickNumber(profile?.weight, pickNumber(profileData.weightKg)),
-    primaryGoal: pickString(diagnostic?.primary_goal, 'Performance Enhancement'),
-    currentIssue: pickString(physicalStatus.currentIssue, 'No'),
-    injurySeverity:
-      injuryLocations.length > 0
-        ? activeInjuries.some((item: unknown) => isRecord(item) && item.recurring === true)
-          ? 'high'
-          : activeInjuries.length > 1
-            ? 'moderate'
-            : 'mild'
-        : undefined,
+    currentIssue: legacyCurrentIssueToSimplified(
+      pickString(physicalStatus.currentIssue, 'No'),
+      hadHighSeverity
+    ),
     injuryLocations,
     coachLockerCode: '',
-    platformConsent: Boolean(profile?.legal_consent_at),
-    medicalDisclaimerConsent: Boolean(profile?.medical_disclaimer_accepted_at),
-    minorGuardianConsent: Boolean(profile?.guardian_consent_confirmed),
+    platformConsent: Boolean(profile?.legal_consent_at && profile?.medical_disclaimer_accepted_at),
+    guardianEmail: '',
   }
 
   return Object.fromEntries(
@@ -138,31 +182,59 @@ async function deriveIndividualAnswersFromLegacy(supabase: SupabaseLike, userId:
   const equipmentAccess = Array.isArray(lifestyle.equipmentAccess)
     ? lifestyle.equipmentAccess.map((value: unknown) => String(value))
     : []
-  const normalizedOccupation = normalizeIndividualOccupation(pickString(basic.occupation))
 
-  const occupationMap: Record<string, string> = {
-    desk: 'desk_job',
-    shift: 'shift_work',
-    manual: 'active_job',
-    hybrid: 'mixed_day',
-    caregiver: 'mixed_day',
-    student: 'mixed_day',
+  const legacyActivity = pickString(basic.activityLevel, 'moderate')
+  const activityLevelMap: Record<string, string> = {
+    sedentary: 'sedentary',
+    moderate: 'moderately_active',
+    active: 'very_active',
   }
 
-  const answers = {
-    age: pickNumber(basic.age),
+  const legacyGoal = pickString(goals.primaryGoal, 'general_fitness')
+  const primaryGoalMap: Record<string, string> = {
+    fat_loss: 'lose_weight',
+    muscle_gain: 'build_strength',
+    endurance: 'improve_cardio',
+    general_fitness: 'general_health',
+    sport_specific: 'general_health',
+  }
+
+  const legacyTimeHorizon = pickString(goals.timeHorizon, '12_weeks')
+  const timeHorizonMap: Record<string, string> = {
+    '4_weeks': '3_months',
+    '8_weeks': '3_months',
+    '12_weeks': '3_months',
+    long_term: 'long_term',
+  }
+
+  const equipmentMap: Record<string, string> = {
+    bodyweight: 'bodyweight',
+    home_dumbbells: 'home_weights',
+    gym: 'full_gym',
+    cardio_machine: 'full_gym',
+    pool: 'full_gym',
+  }
+  const firstEquipment = equipmentAccess[0]
+  const mappedEquipment = firstEquipment ? equipmentMap[firstEquipment] ?? 'bodyweight' : ''
+
+  const legacyInjury = pickString(physiology.injuryHistory, 'none')
+  const injuryMap: Record<string, string> = {
+    none: 'none',
+    minor: 'niggle',
+    moderate: 'active_injury',
+    major: 'active_injury',
+    chronic: 'active_injury',
+  }
+
+  const answers: Record<string, unknown> = {
     gender: pickString(basic.gender, 'Prefer not to say'),
     heightCm: pickNumber(basic.heightCm),
     weightKg: pickNumber(basic.weightKg),
-    occupation: occupationMap[normalizedOccupation] ?? 'mixed_day',
-    activityLevel: pickString(basic.activityLevel, 'moderate'),
-    primaryGoal: pickString(goals.primaryGoal, 'general_fitness'),
-    timeHorizon: pickString(goals.timeHorizon, '12_weeks'),
-    intensityPreference: pickString(goals.intensityPreference, 'moderate'),
-    equipmentAccess,
-    injuryStatus: pickString(physiology.injuryHistory, 'none'),
-    trainingExperience: pickString(physiology.trainingExperience),
-    sleepBaseline: pickNumber(physiology.sleepQuality, 0),
+    activityLevel: activityLevelMap[legacyActivity] ?? 'moderately_active',
+    primaryGoal: primaryGoalMap[legacyGoal] ?? 'general_health',
+    timeHorizon: timeHorizonMap[legacyTimeHorizon] ?? 'long_term',
+    equipmentAccess: mappedEquipment,
+    injuryStatus: injuryMap[legacyInjury] ?? 'none',
   }
 
   return Object.fromEntries(
@@ -173,33 +245,48 @@ async function deriveIndividualAnswersFromLegacy(supabase: SupabaseLike, userId:
   )
 }
 
+function bucketToSquadSize(bucket: string | null | undefined): number | undefined {
+  switch (bucket) {
+    case '1-5':
+      return 5
+    case '6-15':
+      return 12
+    case '16-30':
+      return 22
+    case '30+':
+      return 35
+    default:
+      return undefined
+  }
+}
+
 async function deriveCoachAnswersFromLegacy(supabase: SupabaseLike, userId: string) {
   const [{ data: profile }, { data: team }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('full_name, username, mobile_number')
+      .select('full_name, mobile_number')
       .eq('id', userId)
       .maybeSingle(),
     supabase
       .from('teams')
-      .select('team_name, sport, coaching_level, team_type, squad_size_category, main_coaching_focus, training_frequency')
+      .select('team_name, sport, coaching_level, squad_size_category')
       .eq('coach_id', userId)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
   ])
 
-  const answers = {
+  const answers: Record<string, unknown> = {
     fullName: pickString(profile?.full_name),
-    username: pickString(profile?.username),
     mobileNumber: pickString(profile?.mobile_number),
     teamName: pickString(team?.team_name),
     sportCoached: pickString(team?.sport),
     coachingLevel: pickString(team?.coaching_level),
-    teamType: pickString(team?.team_type),
-    numberOfAthletes: pickString(team?.squad_size_category),
-    mainCoachingFocus: pickString(team?.main_coaching_focus),
-    trainingFrequency: pickString(team?.training_frequency),
+  }
+
+  const squadSize = bucketToSquadSize(team?.squad_size_category as string | null | undefined)
+  if (typeof squadSize === 'number') {
+    answers.squadSize = squadSize
   }
 
   return Object.fromEntries(

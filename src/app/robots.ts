@@ -6,7 +6,6 @@ const privateDisallowRules = [
   "/athlete",
   "/coach",
   "/individual",
-  "/onboarding",
   "/dashboard",
   "/join",
   "/fitstart",

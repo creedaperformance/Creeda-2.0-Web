@@ -281,7 +281,7 @@ function EmptyIndividualView({
   aiEnabled?: boolean
   latestNewspaper?: WeeklyNewspaperRow | null
 }) {
-  const checkinHref = onboardingV2?.hasV2Data ? '/onboarding/daily-ritual' : '/individual/logging'
+  const checkinHref = '/individual/logging'
   return (
     <PerformanceShell
       role="individual"

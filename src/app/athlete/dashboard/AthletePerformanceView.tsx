@@ -8,7 +8,7 @@ import { PerformanceShell } from '@/components/performance-view/PerformanceShell
 import { CalibrationCard } from '@/components/onboarding-v2/CalibrationCard'
 import { NewspaperCard } from '@/components/newspaper/NewspaperCard'
 import type { WeeklyNewspaperRow } from '@/lib/newspaper/queries'
-import { buildDirective, actionTone, type SportContext } from '@/components/performance-view/directives'
+import { buildDirective, actionTone, reasonToHint, type SportContext } from '@/components/performance-view/directives'
 import type {
   AthleteHealthSummary,
   AthleteDashboardSnapshot,
@@ -96,6 +96,17 @@ export function AthletePerformanceView({
   const tone = actionTone(readiness.action)
   const decisionResult = result?.creedaDecision
 
+  // Translate the engine's top reasons into plain-language "what's driving this"
+  // chips. We sort by absolute impact, translate, drop nulls, dedupe against the
+  // whyLine, and surface the top 2.
+  const driverHints = readiness.reasons
+    .slice()
+    .sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact))
+    .map((r) => reasonToHint(r))
+    .filter((hint): hint is string => Boolean(hint))
+    .filter((hint) => !directive.whyLine.toLowerCase().includes(hint.toLowerCase().slice(0, 20)))
+    .slice(0, 2)
+
   return (
     <PerformanceShell
       role="athlete"
@@ -106,6 +117,7 @@ export function AthletePerformanceView({
           actionLabel={readiness.actionLabel}
           headline={directive.headline}
           whyLine={directive.whyLine}
+          driverHints={driverHints}
           confidence={readiness.confidenceLabel}
           tone={tone}
         />
@@ -154,6 +166,7 @@ function ZoneDecision({
   actionLabel,
   headline,
   whyLine,
+  driverHints,
   confidence,
   tone,
 }: {
@@ -161,6 +174,7 @@ function ZoneDecision({
   actionLabel: string
   headline: string
   whyLine: string
+  driverHints?: string[]
   confidence: 'high' | 'medium' | 'low'
   tone: 'go' | 'steady' | 'slow' | 'stop'
 }) {
@@ -179,6 +193,18 @@ function ZoneDecision({
         {headline}
       </h1>
       <p className="mt-3 max-w-md text-sm leading-relaxed text-white/60">{whyLine}</p>
+      {driverHints && driverHints.length > 0 ? (
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+          {driverHints.map((hint) => (
+            <span
+              key={hint}
+              className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/60"
+            >
+              {hint}
+            </span>
+          ))}
+        </div>
+      ) : null}
       <div className="mt-4 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.22em]">
         <span className={toneAccent}>{actionLabel}</span>
         <span className="text-white/30">·</span>
@@ -383,7 +409,7 @@ function EmptyState({
   aiEnabled?: boolean
   latestNewspaper?: WeeklyNewspaperRow | null
 }) {
-  const checkinHref = onboardingV2?.hasV2Data ? '/onboarding/daily-ritual' : '/athlete/checkin'
+  const checkinHref = '/athlete/checkin'
   return (
     <PerformanceShell
       role="athlete"

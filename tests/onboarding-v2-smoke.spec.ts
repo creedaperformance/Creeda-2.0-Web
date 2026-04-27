@@ -1,12 +1,11 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('Onboarding v2 journey guards', () => {
-  test('redirects unauthenticated users from protected onboarding routes', async ({ page }) => {
-    for (const route of ['/onboarding', '/onboarding/phase-2', '/onboarding/daily-ritual']) {
-      await page.goto(route)
-      await expect(page).toHaveURL(/\/login/)
-    }
-  })
+  // Note: the legacy /onboarding, /onboarding/phase-2, /onboarding/daily-ritual web
+  // routes were removed when the parallel OnboardingV2 surface was deleted. Users
+  // now flow through the persona-specific /athlete/onboarding, /coach/onboarding,
+  // /individual/onboarding routes. The v2 write APIs below remain in place for the
+  // mobile app and any internal callers.
 
   test('rejects unauthenticated onboarding v2 write APIs', async ({ request }) => {
     const phase2 = await request.post('/api/onboarding/v2/phase2', {

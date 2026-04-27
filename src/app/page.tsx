@@ -198,7 +198,7 @@ export default function LandingPage() {
                   size="lg"
                   className="h-14 px-8 rounded-2xl bg-[#6ee7b7] text-slate-950 font-black text-sm tracking-[0.18em] uppercase hover:brightness-110 transition-all shadow-[0_0_50px_rgba(110,231,183,0.35)]"
                 >
-                  <Link href="/onboarding" prefetch={false}>
+                  <Link href="/signup" prefetch={false}>
                     Run your first scan
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>

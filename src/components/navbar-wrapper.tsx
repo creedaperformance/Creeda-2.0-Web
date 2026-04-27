@@ -13,7 +13,6 @@ export function NavbarWrapper({ children }: { children: ReactNode }) {
     '/coach',
     '/individual',
     '/dashboard',
-    '/onboarding',
     '/learn',
     '/fitstart',
   ]

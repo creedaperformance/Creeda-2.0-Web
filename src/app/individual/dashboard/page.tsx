@@ -21,7 +21,7 @@ export default async function IndividualDashboard() {
     .eq('id', user.id)
     .single()
 
-  if (!profile) redirect('/onboarding')
+  if (!profile) redirect('/signup')
   if (profile.role !== 'individual') redirect(`/${profile.role}/dashboard`)
   if (!profile.onboarding_completed) redirect('/fitstart')
 

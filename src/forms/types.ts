@@ -5,6 +5,7 @@ export type InputType =
   | 'number'
   | 'phone'
   | 'time'
+  | 'date'
   | 'chips'
   | 'multi-chip'
   | 'emoji'

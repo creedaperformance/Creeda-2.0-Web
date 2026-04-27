@@ -22,7 +22,7 @@ export type ReminderDispatchResult = {
 const REMINDER_BODY = {
   title: 'Creeda · Today’s check-in',
   body: 'Three taps — energy, body, mind. Recalibrate today’s plan.',
-  url: '/onboarding/daily-ritual',
+  url: '/athlete/checkin',
 }
 
 function todayInTimezone(timezone: string) {

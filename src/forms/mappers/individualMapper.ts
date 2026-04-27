@@ -11,45 +11,143 @@ function clampDomain(value: number) {
   return Math.max(1, Math.min(4, Math.round(value)))
 }
 
-function mapOccupation(value: IndividualOnboardingFastStart['occupation']) {
+function computeAgeFromDob(dob: string): number {
+  const dobDate = new Date(`${dob}T00:00:00Z`)
+  if (Number.isNaN(dobDate.getTime())) return 30
+  const now = new Date()
+  let age = now.getUTCFullYear() - dobDate.getUTCFullYear()
+  const monthDiff = now.getUTCMonth() - dobDate.getUTCMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && now.getUTCDate() < dobDate.getUTCDate())) {
+    age -= 1
+  }
+  return Math.max(13, Math.min(90, age))
+}
+
+function mapActivityLevelToLegacy(
+  value: IndividualOnboardingFastStart['activityLevel']
+): 'sedentary' | 'moderate' | 'active' {
   switch (value) {
-    case 'desk_job':
-      return 'desk'
-    case 'shift_work':
-      return 'shift'
-    case 'active_job':
-      return 'hybrid'
-    case 'mixed_day':
+    case 'sedentary':
+      return 'sedentary'
+    case 'lightly_active':
+    case 'moderately_active':
+      return 'moderate'
+    case 'very_active':
+      return 'active'
     default:
-      return 'hybrid'
+      return 'moderate'
   }
 }
 
-function inferScheduleConstraints(value: ReturnType<typeof mapOccupation>) {
+function mapPrimaryGoalToLegacy(
+  value: IndividualOnboardingFastStart['primaryGoal']
+): 'fat_loss' | 'muscle_gain' | 'endurance' | 'general_fitness' | 'sport_specific' {
   switch (value) {
-    case 'shift':
-      return ['shift_work']
-    case 'desk':
-      return ['after_work']
+    case 'lose_weight':
+      return 'fat_loss'
+    case 'build_strength':
+      return 'muscle_gain'
+    case 'improve_cardio':
+      return 'endurance'
+    case 'reduce_stress':
+    case 'general_health':
     default:
-      return ['after_work', 'weekends_only']
+      return 'general_fitness'
   }
 }
 
-function inferTrainingExperience(activityLevel: IndividualOnboardingFastStart['activityLevel']) {
-  if (activityLevel === 'active') return 'intermediate' as const
-  if (activityLevel === 'moderate') return 'novice' as const
-  return 'beginner' as const
+function mapTimeHorizonToLegacy(
+  value: IndividualOnboardingFastStart['timeHorizon']
+): '4_weeks' | '8_weeks' | '12_weeks' | 'long_term' {
+  switch (value) {
+    case '3_months':
+      return '12_weeks'
+    case '6_months':
+    case '1_year':
+    case 'long_term':
+    default:
+      return 'long_term'
+  }
 }
 
-function inferSedentaryHours(occupation: ReturnType<typeof mapOccupation>) {
-  if (occupation === 'desk') return 9
-  if (occupation === 'shift') return 6
-  return 5
+function mapEquipmentAccessToLegacy(
+  value: IndividualOnboardingFastStart['equipmentAccess']
+): string[] {
+  switch (value) {
+    case 'none':
+      return ['bodyweight']
+    case 'bodyweight':
+      return ['bodyweight']
+    case 'home_weights':
+      return ['home_dumbbells']
+    case 'full_gym':
+      return ['gym']
+    default:
+      return ['bodyweight']
+  }
 }
 
-function inferPathway(goal: IndividualOnboardingFastStart['primaryGoal']) {
-  switch (goal) {
+function mapInjuryStatusToLegacy(
+  value: IndividualOnboardingFastStart['injuryStatus']
+): 'none' | 'minor' | 'moderate' | 'major' | 'chronic' {
+  switch (value) {
+    case 'none':
+      return 'none'
+    case 'niggle':
+      return 'minor'
+    case 'active_injury':
+      return 'moderate'
+    default:
+      return 'none'
+  }
+}
+
+function mapMobility(
+  injuryStatus: IndividualOnboardingFastStart['injuryStatus']
+): 'none' | 'mild' | 'moderate' | 'severe' {
+  switch (injuryStatus) {
+    case 'niggle':
+      return 'mild'
+    case 'active_injury':
+      return 'moderate'
+    case 'none':
+    default:
+      return 'none'
+  }
+}
+
+function inferTrainingExperience(
+  activityLevel: IndividualOnboardingFastStart['activityLevel']
+): 'beginner' | 'novice' | 'intermediate' | 'advanced' | 'experienced' {
+  switch (activityLevel) {
+    case 'very_active':
+      return 'intermediate'
+    case 'moderately_active':
+      return 'novice'
+    case 'lightly_active':
+    case 'sedentary':
+    default:
+      return 'beginner'
+  }
+}
+
+function inferIntensityFromActivity(
+  activityLevel: IndividualOnboardingFastStart['activityLevel']
+): 'low' | 'moderate' | 'high' {
+  switch (activityLevel) {
+    case 'very_active':
+      return 'high'
+    case 'moderately_active':
+    case 'lightly_active':
+      return 'moderate'
+    case 'sedentary':
+    default:
+      return 'low'
+  }
+}
+
+function inferPathway(legacyGoal: ReturnType<typeof mapPrimaryGoalToLegacy>) {
+  switch (legacyGoal) {
     case 'fat_loss':
       return { selectedSport: 'Lean Build', selectedPathwayId: 'pathway_fat_loss', title: 'Lean Build' }
     case 'muscle_gain':
@@ -64,53 +162,43 @@ function inferPathway(goal: IndividualOnboardingFastStart['primaryGoal']) {
   }
 }
 
-function inferPhysiologySeed(activityLevel: IndividualOnboardingFastStart['activityLevel']) {
-  if (activityLevel === 'active') return 3
-  if (activityLevel === 'moderate') return 2.5
+function inferPhysiologySeed(legacyActivity: 'sedentary' | 'moderate' | 'active') {
+  if (legacyActivity === 'active') return 3
+  if (legacyActivity === 'moderate') return 2.5
   return 2
-}
-
-function mapMobility(injuryStatus: IndividualOnboardingFastStart['injuryStatus']) {
-  switch (injuryStatus) {
-    case 'minor':
-      return 'mild' as const
-    case 'moderate':
-      return 'moderate' as const
-    case 'major':
-    case 'chronic':
-      return 'severe' as const
-    case 'none':
-    default:
-      return 'none' as const
-  }
 }
 
 export function mapAdaptiveIndividualOnboardingToLegacy(
   input: IndividualOnboardingFastStart
 ): LegacyFitStartPayload {
-  const occupation = mapOccupation(input.occupation)
-  const pathway = inferPathway(input.primaryGoal)
-  const physiologySeed = inferPhysiologySeed(input.activityLevel)
+  const age = computeAgeFromDob(input.dateOfBirth)
+  const legacyActivity = mapActivityLevelToLegacy(input.activityLevel)
+  const legacyGoal = mapPrimaryGoalToLegacy(input.primaryGoal)
+  const legacyTimeHorizon = mapTimeHorizonToLegacy(input.timeHorizon)
+  const legacyEquipment = mapEquipmentAccessToLegacy(input.equipmentAccess)
+  const legacyInjuryStatus = mapInjuryStatusToLegacy(input.injuryStatus)
+  const pathway = inferPathway(legacyGoal)
+  const physiologySeed = inferPhysiologySeed(legacyActivity)
 
   return {
     basic: {
-      age: input.age,
+      age,
       gender: input.gender,
       heightCm: input.heightCm,
       weightKg: input.weightKg,
-      occupation,
-      activityLevel: input.activityLevel,
+      occupation: 'hybrid',
+      activityLevel: legacyActivity,
     },
     physiology: {
       sleepQuality: 3,
       energyLevels: 3,
       stressLevels: 3,
       recoveryRate: 3,
-      injuryHistory: input.injuryStatus,
+      injuryHistory: legacyInjuryStatus,
       mobilityLimitations: mapMobility(input.injuryStatus),
       trainingExperience: inferTrainingExperience(input.activityLevel),
-      endurance_capacity: clampDomain(physiologySeed + (input.primaryGoal === 'endurance' ? 1 : 0)),
-      strength_capacity: clampDomain(physiologySeed + (input.primaryGoal === 'muscle_gain' ? 1 : 0)),
+      endurance_capacity: clampDomain(physiologySeed + (legacyGoal === 'endurance' ? 1 : 0)),
+      strength_capacity: clampDomain(physiologySeed + (legacyGoal === 'muscle_gain' ? 1 : 0)),
       explosive_power: clampDomain(physiologySeed),
       agility_control: clampDomain(physiologySeed),
       reaction_self_perception: clampDomain(physiologySeed),
@@ -122,15 +210,15 @@ export function mapAdaptiveIndividualOnboardingToLegacy(
       reaction_time_ms: undefined,
     },
     lifestyle: {
-      scheduleConstraints: inferScheduleConstraints(occupation),
-      equipmentAccess: input.equipmentAccess,
+      scheduleConstraints: ['after_work'],
+      equipmentAccess: legacyEquipment,
       nutritionHabits: 'basic',
-      sedentaryHours: inferSedentaryHours(occupation),
+      sedentaryHours: legacyActivity === 'sedentary' ? 9 : legacyActivity === 'active' ? 5 : 7,
     },
     goals: {
-      primaryGoal: input.primaryGoal,
-      timeHorizon: input.timeHorizon,
-      intensityPreference: input.intensityPreference,
+      primaryGoal: legacyGoal,
+      timeHorizon: legacyTimeHorizon,
+      intensityPreference: inferIntensityFromActivity(input.activityLevel),
     },
     sport: {
       selectedSport: pathway.selectedSport,
@@ -168,4 +256,3 @@ export function mapAdaptiveIndividualDailyToLegacy(
     session_notes: '',
   }
 }
-
